@@ -1,6 +1,8 @@
 package com.novahub.android
 
 import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -15,6 +17,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -41,7 +48,7 @@ class MainActivity : FragmentActivity() {
 @Composable
 private fun NovaHubScreen(activity: FragmentActivity) {
     var page by remember { mutableStateOf("Home") }
-    var message by remember { mutableStateOf("") }
+    NaN }
     val model = listOf(Build.MANUFACTURER, Build.MODEL).filter { it.isNotBlank() }.distinct().joinToString(" ").ifBlank { "Android device" }
     val patch = if (Build.VERSION.SDK_INT >= 23) Build.VERSION.SECURITY_PATCH ?: "Not reported" else "Not available"
     val bio = when (BiometricManager.from(activity).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL)) {
@@ -53,7 +60,7 @@ private fun NovaHubScreen(activity: FragmentActivity) {
     MaterialTheme(colorScheme = lightColorScheme(primary = Blue, background = Canvas, surface = Color.White)) {
         Scaffold(containerColor = Canvas, bottomBar = {
             NavigationBar(containerColor = Color.White) {
-                listOf("Home" to Icons.Default.Home, "Device" to Icons.Default.PhoneAndroid, "Security" to Icons.Default.Security, "Updates" to Icons.Default.SystemUpdate).forEach { (name, icon) ->
+                listOf("Home" to Icons.Default.Home, "SOS" to Icons.Default.Sos, "Wallet" to Icons.Default.AccountBalanceWallet, "Security" to Icons.Default.Security, "More" to Icons.Default.Menu).forEach { (name, icon) ->
                     NavigationBarItem(selected = page == name, onClick = { page = name; message = "" }, icon = { Icon(icon, null) }, label = { Text(name) })
                 }
             }
@@ -84,6 +91,8 @@ private fun NovaHubScreen(activity: FragmentActivity) {
                                     Text("Everything important.\nIn one place.", color = Color.White, fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold)
                                     Spacer(Modifier.height(8.dp))
                                     Text("A calm, clear view of your Android device and its security options.", color = Color(0xFFE0E8FA), fontSize = 13.sp)
+                                    if (profileName.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text("Welcome, $profileName", color = Color.White, fontSize = 13.sp) }
+                                    Spacer(Modifier.height(8.dp)); Text("Swipe up from this panel to explore more tools.", color = Color(0xFFCBD8F2), fontSize = 11.sp)
                                     Spacer(Modifier.height(18.dp))
                                     Button(onClick = { page = "Security" }, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Navy)) { Text("Check security  →") }
                                 }
@@ -99,6 +108,118 @@ private fun NovaHubScreen(activity: FragmentActivity) {
                                     Text("Privacy by design", fontWeight = FontWeight.Bold, color = TextDark, fontSize = 16.sp)
                                     Spacer(Modifier.height(8.dp))
                                     Text("Nova Hub does not ask for your device PIN, IMEI, contacts, or fingerprint images. Device security remains controlled by Android.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
+                                }
+                            }
+                        }
+                    }
+                    "SOS" -> {
+                        item { SectionHeading("Emergency SOS", "Choose the recipient and review the message before sending.") }
+                        item {
+                            Card(shape = RoundedCornerShape(22.dp)) {
+                                Column(Modifier.padding(18.dp)) {
+                                    Text("Emergency contact", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedTextField(value = emergencyNumber, onValueChange = { emergencyNumber = it }, label = { Text("Phone number") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedTextField(value = emergencyMessage, onValueChange = { emergencyMessage = it }, label = { Text("Message") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                                    Spacer(Modifier.height(12.dp))
+                                    Button(onClick = {
+                                        if (emergencyNumber.isBlank()) message = "Enter an emergency contact number first."
+                                        else try {
+                                            val uri = Uri.parse("smsto:" + Uri.encode(emergencyNumber))
+                                            val intent = Intent(Intent.ACTION_SENDTO, uri).putExtra("sms_body", emergencyMessage)
+                                            activity.startActivity(intent)
+                                            message = "Messaging app opened. Review and send the SOS yourself."
+                                        } catch (_: Exception) { message = "No compatible messaging app was found." }
+                                    }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Sos, null); Spacer(Modifier.width(8.dp)); Text("Open SOS message") }
+                                    OutlinedButton(onClick = { openSetting(activity, Settings.ACTION_LOCATION_SOURCE_SETTINGS) { message = it } }, modifier = Modifier.fillMaxWidth()) { Text("Check location settings") }
+                                    Text("This opens your messaging app; it does not silently send SMS or contact emergency services. Location is not attached automatically.", color = Subtle, fontSize = 11.sp, lineHeight = 16.sp)
+                                }
+                            }
+                        }
+                    }
+                    "Wallet" -> {
+                        item { SectionHeading("Nova Wallet", "Payment hand-off and document selection.") }
+                        item {
+                            Card(shape = RoundedCornerShape(22.dp)) {
+                                Column(Modifier.padding(18.dp)) {
+                                    Text("UPI payment", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                                    Text("Nova Hub can hand a payment request to an installed UPI app. Check recipient and amount in that app before approving.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
+                                    Spacer(Modifier.height(12.dp))
+                                    OutlinedTextField(value = payeeName, onValueChange = { payeeName = it }, label = { Text("Payee name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedTextField(value = upiId, onValueChange = { upiId = it }, label = { Text("Payee UPI ID") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedTextField(value = amount, onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' }.take(10) }, label = { Text("Amount (INR)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                    Spacer(Modifier.height(12.dp))
+                                    Button(onClick = {
+                                        val parsed = amount.toBigDecimalOrNull()
+                                        if (!upiId.matches(Regex("[A-Za-z0-9._-]{2,256}@[A-Za-z]{2,64}")) || parsed == null || parsed <= java.math.BigDecimal.ZERO) {
+                                            message = "Enter a valid UPI ID and a positive amount."
+                                        } else try {
+                                            val uri = Uri.Builder().scheme("upi").authority("pay").appendQueryParameter("pa", upiId.trim()).appendQueryParameter("pn", payeeName.ifBlank { upiId.trim() }).appendQueryParameter("am", parsed.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()).appendQueryParameter("cu", "INR").build()
+                                            activity.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                                            message = "UPI app opened. Verify recipient and amount there; Nova Hub does not process or confirm payments."
+                                        } catch (_: Exception) { message = "No UPI app could handle this request. Install a supported UPI app first." }
+                                    }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.QrCode, null); Spacer(Modifier.width(8.dp)); Text("Continue to UPI app") }
+                                }
+                            }
+                        }
+                        item {
+                            Card(shape = RoundedCornerShape(22.dp)) {
+                                Column(Modifier.padding(18.dp)) {
+                                    Text("PAN / Aadhaar document picker", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                                    Spacer(Modifier.height(6.dp))
+                                    Text("Choose a document to locate it. This initial picker does not copy it into an encrypted Nova Hub vault, so do not treat this as secure document storage yet.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
+                                    if (selectedDocumentName.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text("Selected: $selectedDocumentName", color = TextDark, fontSize = 12.sp) }
+                                    Spacer(Modifier.height(12.dp))
+                                    OutlinedButton(onClick = { documentPicker.launch(arrayOf("application/pdf", "image/*")) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.FolderOpen, null); Spacer(Modifier.width(8.dp)); Text("Choose document") }
+                                }
+                            }
+                        }
+                    }
+                    "More" -> {
+                        item { SectionHeading("More controls", "Open supported Android system controls.") }
+                        item {
+                            MetricCard(Icons.Default.Lock, "App lock", "Android system lock", "Nova Hub cannot universally lock other apps without special device-owner or accessibility setup.")
+                        }
+                        item {
+                            Card(shape = RoundedCornerShape(22.dp)) {
+                                Column(Modifier.padding(18.dp)) {
+                                    Text("App-lock options", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                                    Text("Use your phone's built-in App Lock if your manufacturer provides it. Nova Hub cannot enable another manufacturer's feature automatically.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
+                                    Spacer(Modifier.height(12.dp))
+                                    Button(onClick = { openSetting(activity, Settings.ACTION_SECURITY_SETTINGS) { message = it } }, modifier = Modifier.fillMaxWidth()) { Text("Open security settings") }
+                                }
+                            }
+                        }
+                        item {
+                            Card(shape = RoundedCornerShape(22.dp)) {
+                                Column(Modifier.padding(18.dp)) {
+                                    Text("Parental controls", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                                    Text("Android's Family Link / Digital Wellbeing controls require setup by a parent or device administrator. This button opens system settings where available.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
+                                    Spacer(Modifier.height(12.dp))
+                                    Button(onClick = { openSetting(activity, "android.settings.DIGITAL_WELLBEING_SETTINGS") { message = it } }, modifier = Modifier.fillMaxWidth()) { Text("Open Digital Wellbeing") }
+                                    OutlinedButton(onClick = { openSetting(activity, Settings.ACTION_SETTINGS) { message = it } }, modifier = Modifier.fillMaxWidth()) { Text("Open all Android settings") }
+                                }
+                            }
+                        }
+                        item {
+                            Card(shape = RoundedCornerShape(22.dp)) {
+                                Column(Modifier.padding(18.dp)) {
+                                    Text("Local profile", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                                    Text("This profile name is stored on this device only; it is not a cloud account and cannot be recovered on another phone.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedTextField(value = profileDraft, onValueChange = { profileDraft = it.take(50) }, label = { Text("Profile name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                    Spacer(Modifier.height(10.dp))
+                                    Button(onClick = {
+                                        if (profileDraft.isBlank()) message = "Enter a profile name."
+                                        else {
+                                            profileName = profileDraft.trim()
+                                            activity.getSharedPreferences("nova_profile", 0).edit().putString("name", profileName).apply()
+                                            message = "Saved local profile: $profileName. This is not an online account or security certificate."
+                                        }
+                                    }, modifier = Modifier.fillMaxWidth()) { Text("Save local profile") }
                                 }
                             }
                         }
