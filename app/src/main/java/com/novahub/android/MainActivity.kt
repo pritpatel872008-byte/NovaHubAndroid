@@ -50,7 +50,22 @@ class MainActivity : FragmentActivity() {
 @Composable
 private fun NovaHubScreen(activity: FragmentActivity) {
     var page by remember { mutableStateOf("Home") }
-    NaN }
+    var message by remember { mutableStateOf("") }
+    var profileName by remember { mutableStateOf(activity.getSharedPreferences("nova_profile", 0).getString("name", "") ?: "") }
+    var profileDraft by remember { mutableStateOf(profileName) }
+    var emergencyNumber by remember { mutableStateOf(activity.getSharedPreferences("nova_profile", 0).getString("sos_number", "") ?: "") }
+    var emergencyMessage by remember { mutableStateOf("I need help. Please contact me.") }
+    var upiId by remember { mutableStateOf("") }
+    var payeeName by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    var selectedDocumentName by remember { mutableStateOf("") }
+    var upwardDrag by remember { mutableFloatStateOf(0f) }
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            selectedDocumentName = uri.lastPathSegment?.substringAfterLast('/') ?: "Selected document"
+            message = "Document selected. It is not encrypted or stored in a vault yet."
+        }
+    }
     val model = listOf(Build.MANUFACTURER, Build.MODEL).filter { it.isNotBlank() }.distinct().joinToString(" ").ifBlank { "Android device" }
     val patch = if (Build.VERSION.SDK_INT >= 23) Build.VERSION.SECURITY_PATCH ?: "Not reported" else "Not available"
     val bio = when (BiometricManager.from(activity).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL)) {
