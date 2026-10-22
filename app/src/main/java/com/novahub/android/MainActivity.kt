@@ -13,6 +13,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -84,7 +86,7 @@ private fun NovaHubScreen(activity: FragmentActivity) {
                 when (page) {
                     "Home" -> {
                         item {
-                            Card(shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Navy)) {
+                            Card(shape = RoundedCornerShape(28.dp), modifier = Modifier.pointerInput(page) { detectVerticalDragGestures(onVerticalDrag = { change, dragAmount -> if (dragAmount < 0) { change.consume(); upwardDrag += -dragAmount; if (upwardDrag > 75f) { page = "More"; upwardDrag = 0f } } }, onDragEnd = { upwardDrag = 0f }) }, colors = CardDefaults.cardColors(containerColor = Navy)) {
                                 Column(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF111B30), Color(0xFF314E91), Color(0xFF5C64C8)))).padding(23.dp)) {
                                     Text("DEVICE SECURITY", color = Color(0xFFBBD2FF), fontSize = 10.sp, letterSpacing = 1.6.sp)
                                     Spacer(Modifier.height(12.dp))
