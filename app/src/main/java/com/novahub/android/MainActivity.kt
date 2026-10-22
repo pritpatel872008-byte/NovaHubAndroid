@@ -62,8 +62,20 @@ private fun NovaHubScreen(activity: FragmentActivity) {
     var upwardDrag by remember { mutableFloatStateOf(0f) }
     val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            selectedDocumentName = uri.lastPathSegment?.substringAfterLast('/') ?: "Selected document"
-            message = "Document selected. It is not encrypted or stored in a vault yet."
+            try {
+                val displayName = activity.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                } ?: (uri.lastPathSegment?.substringAfterLast('/') ?: "private-document")
+                val bytes = activity.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: throw IllegalStateException("Could not read selected document.")
+                val id = System.currentTimeMillis().toString()
+                SecureVault.save(activity.filesDir, id, bytes)
+                activity.getSharedPreferences("nova_profile", 0).edit().putString("vault_\$id", "\$displayName|\u0024{bytes.size}").apply()
+                selectedDocumentName = displayName
+                message = "Document encrypted with AES-GCM and saved in Nova Hub private storage."
+            } catch (e: Exception) {
+                message = "Could not save encrypted document: " + (e.message ?: "unknown error")
+            }
         }
     }
     val model = listOf(Build.MANUFACTURER, Build.MODEL).filter { it.isNotBlank() }.distinct().joinToString(" ").ifBlank { "Android device" }
