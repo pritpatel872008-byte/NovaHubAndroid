@@ -197,12 +197,12 @@ private fun NovaHubScreen(activity: FragmentActivity) {
                         item {
                             Card(shape = RoundedCornerShape(22.dp)) {
                                 Column(Modifier.padding(18.dp)) {
-                                    Text("PAN / Aadhaar document picker", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                                    Text("Encrypted PAN / Aadhaar vault", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextDark)
                                     Spacer(Modifier.height(6.dp))
-                                    Text("Choose a document to locate it. This initial picker does not copy it into an encrypted Nova Hub vault, so do not treat this as secure document storage yet.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
-                                    if (selectedDocumentName.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text("Selected: $selectedDocumentName", color = TextDark, fontSize = 12.sp) }
+                                    Text("Choose a PDF or image to encrypt with AES-GCM and store in Nova Hub's private app storage. The key is held by Android Keystore. Keep exported copies secure.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
+                                    if (selectedDocumentName.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text("Saved encrypted: $selectedDocumentName", color = TextDark, fontSize = 12.sp) }
                                     Spacer(Modifier.height(12.dp))
-                                    OutlinedButton(onClick = { documentPicker.launch(arrayOf("application/pdf", "image/*")) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.FolderOpen, null); Spacer(Modifier.width(8.dp)); Text("Choose document") }
+                                    OutlinedButton(onClick = { documentPicker.launch(arrayOf("application/pdf", "image/*")) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.FolderOpen, null); Spacer(Modifier.width(8.dp)); Text("Encrypt and save document") }
                                 }
                             }
                         }
