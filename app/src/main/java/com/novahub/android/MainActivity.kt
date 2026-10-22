@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.google.android.gms.mlkit.vision.codescanner.GmsBarcodeScanning
 
 private val Navy = Color(0xFF101A2C)
 private val Blue = Color(0xFF4778F5)
@@ -59,6 +60,7 @@ private fun NovaHubScreen(activity: FragmentActivity) {
     var payeeName by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var selectedDocumentName by remember { mutableStateOf("") }
+    var qrValue by remember { mutableStateOf("") }
     var upwardDrag by remember { mutableFloatStateOf(0f) }
     val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -191,6 +193,27 @@ private fun NovaHubScreen(activity: FragmentActivity) {
                                             message = "UPI app opened. Verify recipient and amount there; Nova Hub does not process or confirm payments."
                                         } catch (_: Exception) { message = "No UPI app could handle this request. Install a supported UPI app first." }
                                     }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.QrCode, null); Spacer(Modifier.width(8.dp)); Text("Continue to UPI app") }
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedButton(onClick = {
+                                        try {
+                                            GmsBarcodeScanning.getClient(activity).startScan()
+                                                .addOnSuccessListener { barcode ->
+                                                    qrValue = barcode.rawValue.orEmpty()
+                                                    if (qrValue.startsWith("upi://pay", ignoreCase = true)) {
+                                                        val parsedUri = Uri.parse(qrValue)
+                                                        upiId = parsedUri.getQueryParameter("pa").orEmpty()
+                                                        payeeName = parsedUri.getQueryParameter("pn").orEmpty()
+                                                        amount = parsedUri.getQueryParameter("am").orEmpty()
+                                                        message = "UPI QR scanned. Review payee and amount before continuing. No payment was made."
+                                                    } else {
+                                                        message = if (qrValue.isBlank()) "QR code contained no readable text." else "QR scanned. It is not a UPI payment QR; review content before opening any link."
+                                                    }
+                                                }
+                                                .addOnCanceledListener { message = "QR scan cancelled." }
+                                                .addOnFailureListener { message = "QR scanning failed or Google Play services is unavailable." }
+                                        } catch (_: Exception) { message = "QR scanner could not be opened on this device." }
+                                    }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.QrCodeScanner, null); Spacer(Modifier.width(8.dp)); Text("Scan payment QR") }
+                                    if (qrValue.isNotBlank()) Text("QR content scanned", color = Subtle, fontSize = 11.sp)
                                 }
                             }
                         }
