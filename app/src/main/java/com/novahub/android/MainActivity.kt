@@ -91,7 +91,7 @@ private fun NovaHubScreen(activity: FragmentActivity) {
     MaterialTheme(colorScheme = lightColorScheme(primary = Blue, background = Canvas, surface = Color.White)) {
         Scaffold(containerColor = Canvas, bottomBar = {
             NavigationBar(containerColor = Color.White) {
-                listOf("Home" to Icons.Default.Home, "SOS" to Icons.Default.Sos, "Wallet" to Icons.Default.AccountBalanceWallet, "Security" to Icons.Default.Security, "More" to Icons.Default.Menu).forEach { (name, icon) ->
+                listOf("Home" to Icons.Default.Home, "SOS" to Icons.Default.Warning, "Wallet" to Icons.Default.AccountBalanceWallet, "Security" to Icons.Default.Security, "More" to Icons.Default.Menu).forEach { (name, icon) ->
                     NavigationBarItem(selected = page == name, onClick = { page = name; message = "" }, icon = { Icon(icon, null) }, label = { Text(name) })
                 }
             }
@@ -162,7 +162,7 @@ private fun NovaHubScreen(activity: FragmentActivity) {
                                             activity.startActivity(intent)
                                             message = "Messaging app opened. Review and send the SOS yourself."
                                         } catch (_: Exception) { message = "No compatible messaging app was found." }
-                                    }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Sos, null); Spacer(Modifier.width(8.dp)); Text("Open SOS message") }
+                                    }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Warning, null); Spacer(Modifier.width(8.dp)); Text("Open SOS message") }
                                     OutlinedButton(onClick = { openSetting(activity, Settings.ACTION_LOCATION_SOURCE_SETTINGS) { message = it } }, modifier = Modifier.fillMaxWidth()) { Text("Check location settings") }
                                     Text("This opens your messaging app; it does not silently send SMS or contact emergency services. Location is not attached automatically.", color = Subtle, fontSize = 11.sp, lineHeight = 16.sp)
                                 }
