@@ -70,7 +70,7 @@ private fun NovaHubScreen(activity: FragmentActivity) {
                     ?: throw IllegalStateException("Could not read selected document.")
                 val id = System.currentTimeMillis().toString()
                 SecureVault.save(activity.filesDir, id, bytes)
-                activity.getSharedPreferences("nova_profile", 0).edit().putString("vault_\$id", "\$displayName|\u0024{bytes.size}").apply()
+                activity.getSharedPreferences("nova_profile", 0).edit().putString("vault_$id", "$displayName|${bytes.size}").apply()
                 selectedDocumentName = displayName
                 message = "Document encrypted with AES-GCM and saved in Nova Hub private storage."
             } catch (e: Exception) {
