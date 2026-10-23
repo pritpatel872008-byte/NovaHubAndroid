@@ -51,6 +51,9 @@ class MainActivity : FragmentActivity() {
 @Composable
 private fun NovaHubScreen(activity: FragmentActivity) {
     var page by remember { mutableStateOf("Home") }
+    val securityPrefs = remember { activity.getSharedPreferences("nova_security", 0) }
+    var pinHash by remember { mutableStateOf(securityPrefs.getString("pin_hash", "") ?: "") }
+    var isUnlocked by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var profileName by remember { mutableStateOf(activity.getSharedPreferences("nova_profile", 0).getString("name", "") ?: "") }
     var profileDraft by remember { mutableStateOf(profileName) }
@@ -94,6 +97,28 @@ private fun NovaHubScreen(activity: FragmentActivity) {
         else -> "Check device security settings"
     }
     MaterialTheme(colorScheme = lightColorScheme(primary = Blue, background = Canvas, surface = Color.White)) {
+        if (pinHash.isBlank() || !isUnlocked) {
+            PinGate(
+                activity = activity,
+                isSetup = pinHash.isBlank(),
+                onSetPin = { salt, hash ->
+                    securityPrefs.edit().putString("pin_salt", salt).putString("pin_hash", hash).apply()
+                    pinHash = hash
+                    isUnlocked = true
+                    message = "Nova Hub PIN set on this device."
+                },
+                onUnlock = { isUnlocked = true },
+                onSos = {
+                    val prefs = activity.getSharedPreferences("nova_profile", 0)
+                    val number = prefs.getString("sos_number", "") ?: ""
+                    if (number.isBlank()) {
+                        message = "Set an emergency number from SOS after unlocking Nova Hub."
+                    } else try {
+                        activity.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + Uri.encode(number))).putExtra("sms_body", "I need help. Please contact me."))
+                    } catch (_: Exception) { message = "No compatible messaging app was found." }
+                }
+            )
+        } else {
         Scaffold(containerColor = Canvas, bottomBar = {
             NavigationBar(containerColor = Color.White) {
                 listOf("Home" to Icons.Default.Home, "SOS" to Icons.Default.Warning, "Wallet" to Icons.Default.AccountBalanceWallet, "Security" to Icons.Default.Security, "More" to Icons.Default.Menu).forEach { (name, icon) ->
@@ -366,7 +391,63 @@ private fun NovaHubScreen(activity: FragmentActivity) {
                 }
             }
         }
+        }
     }
+}
+
+@Composable
+private fun PinGate(
+    activity: FragmentActivity,
+    isSetup: Boolean,
+    onSetPin: (String, String) -> Unit,
+    onUnlock: () -> Unit,
+    onSos: () -> Unit
+) {
+    var pin by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    Column(
+        modifier = Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Navy, Color(0xFF263F76), Color(0xFF101A2C)))).padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(Icons.Default.Shield, null, tint = Color(0xFFBBD2FF), modifier = Modifier.size(52.dp))
+        Spacer(Modifier.height(18.dp))
+        Text(if (isSetup) "Protect Nova Hub" else "Unlock Nova Hub", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text(if (isSetup) "Create a 6-digit app PIN. It is stored as a salted SHA-256 hash on this device." else "Enter your 6-digit app PIN to continue.", color = Color(0xFFD9E3F7), fontSize = 13.sp)
+        Spacer(Modifier.height(18.dp))
+        OutlinedTextField(value = pin, onValueChange = { pin = it.filter(Char::isDigit).take(6); error = "" }, label = { Text("6-digit PIN") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), singleLine = true, modifier = Modifier.fillMaxWidth())
+        if (isSetup) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(value = confirmation, onValueChange = { confirmation = it.filter(Char::isDigit).take(6); error = "" }, label = { Text("Confirm PIN") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), singleLine = true, modifier = Modifier.fillMaxWidth())
+        }
+        if (error.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text(error, color = Color(0xFFFFB4AB), fontSize = 12.sp) }
+        Spacer(Modifier.height(14.dp))
+        Button(onClick = {
+            if (pin.length != 6) error = "Enter exactly 6 digits."
+            else if (isSetup && pin != confirmation) error = "PINs do not match."
+            else if (isSetup) {
+                val saltBytes = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+                val salt = saltBytes.joinToString("") { "%02x".format(it) }
+                onSetPin(salt, hashNovaPin(pin, salt))
+            } else {
+                val prefs = activity.getSharedPreferences("nova_security", 0)
+                val salt = prefs.getString("pin_salt", "") ?: ""
+                if (salt.isNotBlank() && hashNovaPin(pin, salt) == (prefs.getString("pin_hash", "") ?: "")) onUnlock()
+                else error = "Incorrect PIN."
+            }
+        }, modifier = Modifier.fillMaxWidth()) { Text(if (isSetup) "Set PIN and continue" else "Unlock") }
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(onClick = onSos, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Warning, null); Spacer(Modifier.width(8.dp)); Text("Emergency SOS") }
+        Spacer(Modifier.height(10.dp))
+        Text("Biometric unlock and PIN recovery are not configured yet. Do not forget this PIN; reinstalling the app may remove local settings and vault access.", color = Color(0xFFD9E3F7), fontSize = 11.sp)
+    }
+}
+
+private fun hashNovaPin(pin: String, salt: String): String {
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+    return digest.digest((salt + pin).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 }
 
 @Composable
