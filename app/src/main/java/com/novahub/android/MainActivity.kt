@@ -60,6 +60,9 @@ private fun NovaHubScreen(activity: FragmentActivity) {
     var payeeName by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var selectedDocumentName by remember { mutableStateOf("") }
+    var documentType by remember { mutableStateOf("Aadhaar Card") }
+    var customDocumentLabel by remember { mutableStateOf("") }
+    var slideWalletEnabled by remember { mutableStateOf(activity.getSharedPreferences("nova_profile", 0).getBoolean("wallet_slide_enabled", false)) }
     var qrValue by remember { mutableStateOf("") }
     var upwardDrag by remember { mutableFloatStateOf(0f) }
     val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -72,9 +75,11 @@ private fun NovaHubScreen(activity: FragmentActivity) {
                     ?: throw IllegalStateException("Could not read selected document.")
                 val id = System.currentTimeMillis().toString()
                 SecureVault.save(activity.filesDir, id, bytes)
-                activity.getSharedPreferences("nova_profile", 0).edit().putString("vault_$id", "$displayName|${bytes.size}").apply()
-                selectedDocumentName = displayName
-                message = "Document encrypted with AES-GCM and saved in Nova Hub private storage."
+                val label = if (documentType == "Other") customDocumentLabel.trim() else documentType
+                if (label.isBlank()) throw IllegalArgumentException("Choose a document type or enter a custom label before saving.")
+                activity.getSharedPreferences("nova_profile", 0).edit().putString("vault_$id", "$label|$displayName|${bytes.size}").apply()
+                selectedDocumentName = "$label — $displayName"
+                message = "Encrypted document saved in private app storage."
             } catch (e: Exception) {
                 message = "Could not save encrypted document: " + (e.message ?: "unknown error")
             }
@@ -174,6 +179,31 @@ private fun NovaHubScreen(activity: FragmentActivity) {
                         item {
                             Card(shape = RoundedCornerShape(22.dp)) {
                                 Column(Modifier.padding(18.dp)) {
+                                    Text("Wallet quick access", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                                    Text("Enable the slide shortcut to reach Wallet. This shortcut only navigates; it does not bypass security.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Enable slide shortcut", color = TextDark, fontSize = 14.sp)
+                                        Switch(checked = slideWalletEnabled, onCheckedChange = { enabled ->
+                                            slideWalletEnabled = enabled
+                                            activity.getSharedPreferences("nova_profile", 0).edit().putBoolean("wallet_slide_enabled", enabled).apply()
+                                            message = if (enabled) "Wallet slide shortcut enabled on the Home panel." else "Wallet slide shortcut disabled."
+                                        })
+                                    }
+                                    if (slideWalletEnabled) {
+                                        var slideProgress by remember { mutableFloatStateOf(0f) }
+                                        Slider(value = slideProgress, onValueChange = { slideProgress = it }, onValueChangeFinished = {
+                                            if (slideProgress >= 0.95f) { page = "Wallet"; message = "Wallet opened. Review payment details before using your UPI app." }
+                                            else message = "Slide all the way to open Wallet."
+                                            slideProgress = 0f
+                                        }, valueRange = 0f..1f)
+                                        Text("Slide fully to open Wallet", color = Subtle, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                        item {
+                            Card(shape = RoundedCornerShape(22.dp)) {
+                                Column(Modifier.padding(18.dp)) {
                                     Text("UPI payment", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextDark)
                                     Text("Nova Hub can hand a payment request to an installed UPI app. Check recipient and amount in that app before approving.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
                                     Spacer(Modifier.height(12.dp))
@@ -222,7 +252,18 @@ private fun NovaHubScreen(activity: FragmentActivity) {
                                 Column(Modifier.padding(18.dp)) {
                                     Text("Encrypted PAN / Aadhaar vault", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextDark)
                                     Spacer(Modifier.height(6.dp))
-                                    Text("Choose a PDF or image to encrypt with AES-GCM and store in Nova Hub's private app storage. The key is held by Android Keystore. Keep exported copies secure.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
+                                    Text("Choose a label, then select a PDF or image. Files are encrypted with AES-GCM and stored in Nova Hub private app storage; the key is held by Android Keystore.", color = Subtle, fontSize = 12.sp, lineHeight = 18.sp)
+                                    Spacer(Modifier.height(10.dp))
+                                    Text("Document type", color = TextDark, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    listOf("Aadhaar Card", "PAN Card", "Other").forEach { type ->
+                                        Row(Modifier.fillMaxWidth().clickable { documentType = type }, verticalAlignment = Alignment.CenterVertically) {
+                                            RadioButton(selected = documentType == type, onClick = { documentType = type })
+                                            Text(type, color = TextDark, fontSize = 13.sp)
+                                        }
+                                    }
+                                    if (documentType == "Other") {
+                                        OutlinedTextField(value = customDocumentLabel, onValueChange = { customDocumentLabel = it.take(60) }, label = { Text("Custom document name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                    }
                                     if (selectedDocumentName.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text("Saved encrypted: $selectedDocumentName", color = TextDark, fontSize = 12.sp) }
                                     Spacer(Modifier.height(12.dp))
                                     OutlinedButton(onClick = { documentPicker.launch(arrayOf("application/pdf", "image/*")) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.FolderOpen, null); Spacer(Modifier.width(8.dp)); Text("Encrypt and save document") }
